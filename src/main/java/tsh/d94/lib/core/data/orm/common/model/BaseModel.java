@@ -1,0 +1,161 @@
+package tsh.d94.lib.core.data.orm.common.model;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+
+import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.FilterDef;
+import org.hibernate.annotations.ParamDef;
+import org.hibernate.envers.Audited;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PreUpdate;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.SuperBuilder;
+import lombok.extern.slf4j.Slf4j;
+import tsh.d94.lib.core.config.ApplicationProperties;
+import tsh.d94.lib.core.data.constant.UseStatCd;
+import tsh.d94.lib.core.spec.ApMessageBody;
+import tsh.d94.lib.core.spec.constant.ApMessageList;
+import tsh.d94.lib.core.spec.process.ApCommonProcessVo;
+
+@Slf4j
+@MappedSuperclass
+@Getter
+@Setter
+@NoArgsConstructor
+@Audited
+@SuperBuilder
+@FilterDef(
+	name = "tenantFilter",
+	parameters = @ParamDef(name = "tenant", type = String.class)
+)
+@Filter(name = "tenantFilter", condition = "TENANT = :tenant")
+public class BaseModel extends BasicAudit {
+
+	public static final String SRV_ID = "SRV_ID";
+	public static final String TENANT = "TENANT";
+	public static final String TRACE_ID = "TRACE_ID";
+	public static final String USE_STAT_CD = "USE_STAT_CD";
+	public static final String EVNT_NM = "EVNT_NM";
+	public static final String PREV_EVNT_NMM = "PREV_EVNT_NM";
+	public static final String ACT_CM = "ACT_CM";
+	public static final String ACT_CD = "ACT_CD";
+
+	@NotBlank(message = "ServiceId is essential")
+	@Column(name = SRV_ID, length = 50, nullable = false)
+	private String srvId;
+
+	@NotBlank(message = "Tenant is essential")
+	@Column(name = TENANT, length = 50, nullable = false)
+	private String tenant;
+
+	@NotBlank(message = "TraceId is essential")
+	@Column(name = TRACE_ID, length = 100, nullable = false)
+	private String traceId;
+
+	@Column(name = USE_STAT_CD, length = 40, nullable = false)
+	@Enumerated(EnumType.STRING)
+	private UseStatCd useStatCd;
+
+	@NotNull(message = "EventName is essential")
+	@Column(name = EVNT_NM, length = 100, nullable = false)
+	private String evtNm;
+
+	@NotNull(message = "Previous eventName is essential")
+	@Column(name = PREV_EVNT_NMM, length = 100, nullable = false)
+	private String prevEvntNm;
+
+	@Column(name = ACT_CM)
+	private String actCm;
+
+	@Column(name = ACT_CD)
+	private String actCd;
+
+	public <T extends ApMessageBody> void initFromProcessVo(ApCommonProcessVo<T> procVo) {
+
+		this.defaultUpdate(procVo);
+		evtNm = String.valueOf(procVo.getEventNm());
+		prevEvntNm = String.valueOf(ApMessageList.InitializeData);
+
+	}
+
+	public <T extends ApMessageBody> void updateFromProcessVo(ApCommonProcessVo<T> procVo, BaseModel existing) {
+
+		this.defaultUpdate(procVo);
+		prevEvntNm = existing.getEvtNm();
+		evtNm = String.valueOf(procVo.getEventNm());
+		traceId = procVo.getTraceId();
+
+	}
+
+	private <T extends ApMessageBody> void defaultUpdate(ApCommonProcessVo<T> procVo) {
+
+		srvId = ApplicationProperties.getApplicationServiceName();
+		tenant = procVo.getTenant();
+		traceId = procVo.getTraceId();
+		useStatCd = UseStatCd.Usable;
+
+	}
+
+	public void mergeFields(BaseModel source) {
+		Class<?> current = source.getClass();
+		while (current != null && current != Object.class) {
+			for (Field field : current.getDeclaredFields()) {
+				// static, final 필드 제외
+				if (Modifier.isStatic(field.getModifiers()) ||
+					Modifier.isFinal(field.getModifiers())) {
+					continue;
+				}
+				field.setAccessible(true);
+				try {
+					Object value = field.get(source);
+					// null이 아니고 primitive 기본값이 아닌 경우만 복사
+					if (value != null && !isDefaultPrimitive(field, value)) {
+						field.set(this, value);
+					}
+				} catch (IllegalAccessException e) {
+					log.warn("mergeFields: cannot access field {}", field.getName());
+				}
+			}
+			current = current.getSuperclass();
+		}
+	}
+
+	private boolean isDefaultPrimitive(Field field, Object value) {
+		Class<?> type = field.getType();
+		if (type == int.class || type == Integer.class)
+			return (int)value == 0;
+		if (type == long.class || type == Long.class)
+			return (long)value == 0L;
+		if (type == boolean.class || type == Boolean.class)
+			return !(boolean)value;
+		if (type == double.class || type == Double.class)
+			return (double)value == 0.0;
+		return false;
+	}
+
+	protected void onDataInsert() {
+
+		log.info("called when insert data at the very first.");
+		if (this.useStatCd == null) {
+			log.info("warn useStatCd is null. set defulat Usable");
+			this.useStatCd = UseStatCd.Usable;
+		}
+
+	}
+
+	@PreUpdate
+	protected void onPreUpdate() {
+
+		log.info("called when record has been updated.");
+	}
+
+}
