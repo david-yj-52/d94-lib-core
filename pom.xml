@@ -88,6 +88,11 @@
             <name>GitHub Packages - d94-lib-core</name>
             <url>https://maven.pkg.github.com/david-yj-52/d94-lib-core</url>
         </repository>
+        <snapshotRepository>
+            <id>github-lib-core</id>
+            <name>GitHub Packages - d94-lib-core</name>
+            <url>https://maven.pkg.github.com/david-yj-52/d94-lib-core</url>
+        </snapshotRepository>
     </distributionManagement>
 
 </project>
