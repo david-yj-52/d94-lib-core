@@ -1,6 +1,8 @@
 package tsh.d94.lib.core.config.security;
 
-import org.springframework.security.core.userdetails.User;
+import java.util.List;
+
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -21,10 +23,12 @@ public class CustomUserDetailsService implements UserDetailsService {
 		GsUserModel user = userRepo.findByEmail(username)
 			.orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
 
-		return User.builder()
-			.username(user.getEmail())
-			.password(user.getPwdHash())
-			.roles("USER") // TODO Implement actual roles from GS_ROLE
-			.build();
+		return new D94UserDetails(
+			user.getEmail(),
+			user.getPwdHash(),
+			List.of(new SimpleGrantedAuthority("ROLE_USER")), // TODO Implement actual roles from GS_ROLE
+			user.getObjId(),
+			user.getTenant()
+		);
 	}
 }
