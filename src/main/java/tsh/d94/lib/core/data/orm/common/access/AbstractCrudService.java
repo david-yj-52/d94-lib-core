@@ -71,6 +71,11 @@ public abstract class AbstractCrudService<M extends BaseModel, ID>
 
 	@Override
 	public java.util.Optional<M> findByIdOptional(ID id) {
+		// null id 로 리포지토리를 부르면 Spring Data 가 트랜잭션 안에서 IllegalArgumentException 을 던져
+		// 호출자 트랜잭션이 rollback-only 가 된다 (아래 catch 가 삼켜도 커밋 시 UnexpectedRollbackException)
+		if (id == null) {
+			return java.util.Optional.empty();
+		}
 		try {
 			enableTenantFilter();
 			return getRepository().findById(id);
