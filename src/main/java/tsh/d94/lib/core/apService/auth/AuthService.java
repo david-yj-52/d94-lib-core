@@ -1,6 +1,9 @@
 package tsh.d94.lib.core.apService.auth;
 
+import java.util.Locale;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -34,12 +37,13 @@ public class AuthService {
 
 	@Transactional
 	public void register(RegisterRequest request) {
-		if (userRepo.findByEmail(request.getEmail()).isPresent()) {
-			throw new IllegalArgumentException("Email already exists: " + request.getEmail());
+		String email = normalizeEmail(request.getEmail());
+		if (userRepo.findByEmail(email).isPresent()) {
+			throw new IllegalArgumentException("Email already exists");
 		}
 
 		GsUserModel user = GsUserModel.builder()
-			.email(request.getEmail())
+			.email(email)
 			.userNm(request.getName())
 			.pwdHash(passwordEncoder.encode(request.getPassword()))
 			.srvId(ApplicationProperties.getApplicationServiceName())
@@ -50,16 +54,22 @@ public class AuthService {
 			.prevEvntNm("None")
 			.build();
 
-		userRepo.save(user);
+		try {
+			userRepo.saveAndFlush(user);
+		} catch (DataIntegrityViolationException e) {
+			// 동시 가입: 위 중복 체크를 둘 다 통과하고 EMAIL 유니크 제약(UK01)에서 걸린 경우
+			throw new IllegalArgumentException("Email already exists");
+		}
 	}
 
 	public LoginResponse login(LoginRequest request) {
+		String email = normalizeEmail(request.getEmail());
 		authenticationManager.authenticate(
-			new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+			new UsernamePasswordAuthenticationToken(email, request.getPassword())
 		);
 
-		UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-		GsUserModel user = userRepo.findByEmail(request.getEmail()).orElseThrow();
+		UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+		GsUserModel user = userRepo.findByEmail(email).orElseThrow();
 
 		String accessToken = jwtService.generateAccessToken(userDetails);
 		String refreshToken = jwtService.generateRefreshToken();
@@ -99,5 +109,10 @@ public class AuthService {
 
 	public void logout(String refreshToken) {
 		refreshTokenService.deleteRefreshToken(refreshToken);
+	}
+
+	/** 저장·조회 모두 이 형태로만 — A@x.com 과 a@x.com 은 같은 계정 */
+	private static String normalizeEmail(String email) {
+		return email.trim().toLowerCase(Locale.ROOT);
 	}
 }

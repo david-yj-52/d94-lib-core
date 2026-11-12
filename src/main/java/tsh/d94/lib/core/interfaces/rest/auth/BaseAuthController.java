@@ -1,5 +1,6 @@
 package tsh.d94.lib.core.interfaces.rest.auth;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import tsh.d94.lib.core.apService.auth.AuthService;
 import tsh.d94.lib.core.apService.auth.dto.LoginRequest;
@@ -20,9 +22,12 @@ public abstract class BaseAuthController {
 
 	protected final AuthService authService;
 
+	@Value("${application.security.cookie.secure:true}")
+	protected boolean cookieSecure;
+
 	@PostMapping("/register")
 	@ResponseStatus(HttpStatus.CREATED)
-	public ApiResponse<Void> register(@RequestBody RegisterRequest request) {
+	public ApiResponse<Void> register(@Valid @RequestBody RegisterRequest request) {
 		preRegister(request);
 		authService.register(request);
 		postRegister(request);
@@ -31,7 +36,7 @@ public abstract class BaseAuthController {
 
 	@PostMapping("/login")
 	public ApiResponse<LoginResponse> login(
-		@RequestBody LoginRequest request,
+		@Valid @RequestBody LoginRequest request,
 		HttpServletResponse response
 	) {
 		preLogin(request);
@@ -85,7 +90,7 @@ public abstract class BaseAuthController {
 	protected void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
 		Cookie cookie = new Cookie("refreshToken", refreshToken);
 		cookie.setHttpOnly(true);
-		cookie.setSecure(false); // Set to true in production
+		cookie.setSecure(cookieSecure);
 		cookie.setPath("/");
 		cookie.setMaxAge(7 * 24 * 60 * 60); // 7 days
 		response.addCookie(cookie);
@@ -94,7 +99,7 @@ public abstract class BaseAuthController {
 	protected void clearRefreshTokenCookie(HttpServletResponse response) {
 		Cookie cookie = new Cookie("refreshToken", null);
 		cookie.setHttpOnly(true);
-		cookie.setSecure(false);
+		cookie.setSecure(cookieSecure);
 		cookie.setPath("/");
 		cookie.setMaxAge(0);
 		response.addCookie(cookie);
