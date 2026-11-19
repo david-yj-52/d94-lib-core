@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import tsh.d94.lib.core.apService.auth.AuthService;
 import tsh.d94.lib.core.apService.auth.dto.LoginRequest;
 import tsh.d94.lib.core.apService.auth.dto.LoginResponse;
+import tsh.d94.lib.core.apService.auth.dto.RefreshRequest;
 import tsh.d94.lib.core.apService.auth.dto.RegisterRequest;
 import tsh.d94.lib.core.interfaces.rest.ApiResponse;
 
@@ -50,12 +51,17 @@ public abstract class BaseAuthController {
 		return ApiResponse.ok(loginResponse);
 	}
 
+	/**
+	 * refreshToken 은 쿠키(브라우저 직접 호출) 또는 본문 {@code {refreshToken}}(서버 간 호출)으로 받는다.
+	 * UMD 는 요청의 Cookie 헤더를 버리므로 d94-web 서버는 본문으로 보낸다.
+	 */
 	@PostMapping("/refresh")
 	public ApiResponse<LoginResponse> refresh(
 		HttpServletRequest request,
-		HttpServletResponse response
+		HttpServletResponse response,
+		@RequestBody(required = false) RefreshRequest body
 	) {
-		String refreshToken = getRefreshTokenFromCookie(request);
+		String refreshToken = resolveRefreshToken(request, body);
 		LoginResponse loginResponse = authService.refresh(refreshToken);
 		setRefreshTokenCookie(response, loginResponse.getRefreshToken());
 
@@ -67,9 +73,10 @@ public abstract class BaseAuthController {
 	@PostMapping("/logout")
 	public ApiResponse<Void> logout(
 		HttpServletRequest request,
-		HttpServletResponse response
+		HttpServletResponse response,
+		@RequestBody(required = false) RefreshRequest body
 	) {
-		String refreshToken = getRefreshTokenFromCookie(request);
+		String refreshToken = resolveRefreshToken(request, body);
 		authService.logout(refreshToken);
 		clearRefreshTokenCookie(response);
 		return ApiResponse.noContent();
@@ -105,6 +112,19 @@ public abstract class BaseAuthController {
 		response.addCookie(cookie);
 	}
 
+	/** 쿠키 우선, 없으면 본문. 둘 다 없으면 IllegalArgumentException */
+	protected String resolveRefreshToken(HttpServletRequest request, RefreshRequest body) {
+		String fromCookie = getRefreshTokenFromCookie(request);
+		if (fromCookie != null) {
+			return fromCookie;
+		}
+		if (body != null && body.getRefreshToken() != null && !body.getRefreshToken().isBlank()) {
+			return body.getRefreshToken();
+		}
+		throw new IllegalArgumentException("Refresh token not found");
+	}
+
+	/** refreshToken 쿠키 값. 없으면 null */
 	protected String getRefreshTokenFromCookie(HttpServletRequest request) {
 		if (request.getCookies() != null) {
 			for (Cookie cookie : request.getCookies()) {
@@ -113,6 +133,6 @@ public abstract class BaseAuthController {
 				}
 			}
 		}
-		throw new IllegalArgumentException("Refresh token not found");
+		return null;
 	}
 }
