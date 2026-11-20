@@ -1,5 +1,8 @@
 package tsh.d94.lib.core.apService.auth;
 
+import java.util.List;
+
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class UserService {
 			.email(user.getEmail())
 			.name(user.getUserNm())
 			.avatarUrl(user.getAvatarUrl())
+			.roles(currentRoles())
 			.build();
 	}
 
@@ -48,6 +52,15 @@ public class UserService {
 			.email(user.getEmail())
 			.name(user.getUserNm())
 			.avatarUrl(user.getAvatarUrl())
+			.roles(currentRoles())
 			.build();
+	}
+
+	private static List<String> currentRoles() {
+		return SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+			.map(GrantedAuthority::getAuthority)
+			.map(a -> a.startsWith("ROLE_") ? a.substring(5) : a)
+			.distinct()
+			.toList();
 	}
 }

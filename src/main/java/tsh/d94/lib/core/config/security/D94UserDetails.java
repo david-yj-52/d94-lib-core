@@ -11,7 +11,7 @@ import lombok.Getter;
 /**
  * 로그인 사용자 principal. GS_USER 의 objId·tenant 를 함께 싣는다.
  * HTTP 요청의 tenant 는 토큰이 아니라 이 값(회원가입 때 저장된 GS_USER.TENANT)에서 정한다.
- * TODO 회원 등급(ACL) 정보도 여기에 추가
+ * 역할은 authorities 에 ROLE_* 로 싣는다 (CustomUserDetailsService, GS_USER_ROLE)
  */
 @Getter
 @EqualsAndHashCode(callSuper = true)
